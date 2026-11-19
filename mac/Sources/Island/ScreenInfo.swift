@@ -10,7 +10,7 @@ struct ScreenGeometry {
     var topInset: CGFloat
     var screenFrame: CGRect
 
-    static let fallback = ScreenGeometry(hasNotch: false, restWidth: 132, restHeight: 26, topInset: 0,
+    static let fallback = ScreenGeometry(hasNotch: false, restWidth: 140, restHeight: 22, topInset: 0,
                                          screenFrame: CGRect(x: 0, y: 0, width: 1440, height: 900))
 }
 
@@ -37,6 +37,7 @@ enum ScreenInfo {
                                       topInset: inset, screenFrame: frame)
             }
         }
-        return ScreenGeometry(hasNotch: false, restWidth: 132, restHeight: 26, topInset: 0, screenFrame: frame)
+        // No notch: draw a notch-shaped "lip" hanging from the top edge, like a real one (a little thinner than first tried).
+        return ScreenGeometry(hasNotch: false, restWidth: 140, restHeight: 22, topInset: 0, screenFrame: frame)
     }
 }
