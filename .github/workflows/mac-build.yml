@@ -1,0 +1,42 @@
+name: Build Mac app
+
+# Runs only when the owner asks: either press "Run workflow" on the Actions page,
+# or push a tag that starts with build-mac (this is what Claude does for "build mac").
+on:
+  workflow_dispatch:
+  push:
+    tags: ['build-mac*']
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show tool versions
+        run: |
+          swift --version
+          xcodebuild -version
+
+      - name: Build Island.app
+        run: bash mac/build-app.sh
+
+      - name: Keep the zip on the run page
+        uses: actions/upload-artifact@v4
+        with:
+          name: Island-mac
+          path: mac/build/Island-mac.zip
+          retention-days: 30
+
+      - name: Publish it as a download
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "mac-build-${{ github.run_number }}" mac/build/Island-mac.zip \
+            --title "Island for Mac, build ${{ github.run_number }}" \
+            --notes "Island for Mac (test build ${{ github.run_number }}, commit ${{ github.sha }}). Download Island-mac.zip, unzip it, then follow mac/HOW-TO-INSTALL-MAC.md." \
+            --target "${{ github.sha }}" \
+            --prerelease
