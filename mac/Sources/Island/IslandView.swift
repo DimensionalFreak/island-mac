@@ -56,8 +56,8 @@ struct IslandView: View {
         let height: CGFloat = message.map { controller.expandedHeight(for: $0) } ?? geo.restHeight
         // Real notch: straight sides, small round bottom corners. Fake lip (no notch): the same,
         // plus tiny curves where it meets the top edge, so it looks like it belongs to the screen.
-        let top: CGFloat = message == nil ? (geo.hasNotch ? 0 : 5) : 7
-        let bottom: CGFloat = message == nil ? 9 : 24
+        let top: CGFloat = message == nil ? (geo.hasNotch ? 0 : 4) : 7
+        let bottom: CGFloat = message == nil ? (geo.hasNotch ? 9 : 7) : 24
 
         ZStack(alignment: .top) {
             NotchShape(topRadius: top, bottomRadius: bottom)

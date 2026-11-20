@@ -65,7 +65,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NotificationCenter.default.addObserver(self, selector: #selector(screensChanged),
                                                name: NSApplication.didChangeScreenParametersNotification,
                                                object: nil)
+
+        // Switching desktops (Spaces), going in or out of a full-screen app, or waking the Mac must not
+        // make the island vanish. Each of these is an event macOS sends us; nothing is checked on a timer.
+        let workspace = NSWorkspace.shared.notificationCenter
+        for name in [NSWorkspace.activeSpaceDidChangeNotification,
+                     NSWorkspace.didActivateApplicationNotification,
+                     NSWorkspace.didWakeNotification,
+                     NSWorkspace.screensDidWakeNotification] {
+            workspace.addObserver(self, selector: #selector(keepOnScreen(_:)), name: name, object: nil)
+        }
         screensChanged()
+    }
+
+    /// Brings the island back in front if a desktop or full-screen switch pushed it away.
+    @objc private func keepOnScreen(_ note: Notification) {
+        guard let panel = panel else { return }
+        let lost = !panel.isVisible || !panel.isOnActiveSpace
+        if lost || note.name == NSWorkspace.activeSpaceDidChangeNotification {
+            Log.write("\(note.name.rawValue): island visible=\(panel.isVisible) onActiveSpace=\(panel.isOnActiveSpace)")
+        }
+        if lost {
+            screensChanged()      // puts it back in the right place and in front
+        } else {
+            panel.orderFrontRegardless()
+        }
     }
 
     @objc private func screensChanged() {
