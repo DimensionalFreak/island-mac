@@ -9,6 +9,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
     private var currentSubscription: AnyCancellable?
     private var islandStarted = false
+    private var pinnedToTopSpace = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         Log.rotateIfBig()
@@ -116,6 +117,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         panel?.setFrame(frame, display: true)
         panel?.orderFrontRegardless()
+        if !pinnedToTopSpace, let panel = panel {
+            TopSpace.add(panel)
+            pinnedToTopSpace = true
+        }
         Log.write("Island placed on built-in screen: notch=\(geo.hasNotch) rest=\(Int(geo.restWidth))x\(Int(geo.restHeight)) window=\(frame)")
     }
 
