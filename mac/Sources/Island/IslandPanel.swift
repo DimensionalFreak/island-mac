@@ -13,7 +13,9 @@ final class IslandPanel: NSPanel {
                    backing: .buffered,
                    defer: false)
         isFloatingPanel = true
-        level = NSWindow.Level(rawValue: NSWindow.Level.mainMenu.rawValue + 3)
+        // The very top window layer (the one macOS uses to cover the whole screen). Windows on this layer
+        // are not slid along by the trackpad desktop swipe, unlike ordinary and menu-bar-level windows.
+        level = NSWindow.Level(rawValue: Int(CGShieldingWindowLevel()))
         backgroundColor = .clear
         isOpaque = false
         hasShadow = false
