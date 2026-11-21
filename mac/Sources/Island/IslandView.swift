@@ -1,7 +1,8 @@
 import SwiftUI
 
 /// The black island shape. The top corners flare outward (like the real notch's ears) so a
-/// grown island looks poured out of the notch; the bottom corners are round.
+/// grown island looks poured out of the notch; the bottom corners are round. Both radii are
+/// animatable, so the corners morph smoothly between the sizes.
 struct NotchShape: Shape {
     var topRadius: CGFloat
     var bottomRadius: CGFloat
@@ -46,43 +47,11 @@ extension Color {
     }
 }
 
-struct IslandView: View {
-    @ObservedObject var controller: IslandController
+enum MessageStyle {
+    static let defaultAccent = Color(red: 0.31, green: 0.55, blue: 1.0)
 
-    var body: some View {
-        let geo = controller.geo
-        let message = controller.current
-        let width: CGFloat = message == nil ? geo.restWidth : controller.expandedWidth
-        let height: CGFloat = message.map { controller.expandedHeight(for: $0) } ?? geo.restHeight
-        // Real notch: straight sides, small round bottom corners. Fake lip (no notch): the same,
-        // plus tiny curves where it meets the top edge, so it looks like it belongs to the screen.
-        let top: CGFloat = message == nil ? (geo.hasNotch ? 0 : 4) : 7
-        let bottom: CGFloat = message == nil ? (geo.hasNotch ? 9 : 7) : 24
-
-        ZStack(alignment: .top) {
-            NotchShape(topRadius: top, bottomRadius: bottom)
-                .fill(Color.black)
-                .frame(width: width, height: height)
-
-            if let m = message {
-                CardView(message: m, controller: controller)
-                    .frame(width: width, height: height, alignment: .top)
-                    .transition(.opacity.combined(with: .scale(scale: 0.9, anchor: .top)))
-                    .id(m.source + "/" + m.id)
-            }
-        }
-        .frame(width: controller.windowWidth, height: controller.windowHeight, alignment: .top)
-    }
-}
-
-struct CardView: View {
-    let message: IslandMessage
-    let controller: IslandController
-
-    private var accent: Color { Color(hex: message.category) ?? Color(red: 0.31, green: 0.55, blue: 1.0) }
-
-    private var symbol: String {
-        switch message.kind {
+    static func symbol(for kind: String) -> String {
+        switch kind {
         case "timer": return "timer"
         case "progress": return "arrow.down.circle.fill"
         case "media": return "music.note"
@@ -90,13 +59,112 @@ struct CardView: View {
         default: return "bell.fill"
         }
     }
+}
+
+struct IslandView: View {
+    @ObservedObject var controller: IslandController
+
+    var body: some View {
+        let message = controller.shown
+        let size = controller.size
+        let d = controller.dims(for: size, message: message)
+
+        ZStack(alignment: .top) {
+            NotchShape(topRadius: d.top, bottomRadius: d.bottom)
+                .fill(Color.black)
+
+            if let m = message {
+                CompactLayer(message: m, controller: controller, size: size)
+                    .opacity(size == .compact || size == .hover ? 1 : 0)
+                    .animation(.easeOut(duration: 0.18), value: size)
+                    .allowsHitTesting(false)
+
+                CardView(message: m, controller: controller)
+                    .opacity(size == .expanded ? 1 : 0)
+                    .animation(.easeOut(duration: 0.2).delay(size == .expanded ? 0.1 : 0), value: size)
+                    .allowsHitTesting(size == .expanded)
+            }
+        }
+        .frame(width: d.width, height: d.height, alignment: .top)
+        .clipShape(NotchShape(topRadius: d.top, bottomRadius: d.bottom))
+        .contentShape(NotchShape(topRadius: d.top, bottomRadius: d.bottom))
+        .onTapGesture { controller.tap() }
+        .frame(width: controller.windowBox.width, height: controller.windowBox.height, alignment: .top)
+    }
+}
+
+/// Compact (and hover): a small icon on the left, short info on the right. On a notch Mac the
+/// middle is left empty because that is where the camera is.
+struct CompactLayer: View {
+    let message: IslandMessage
+    let controller: IslandController
+    let size: IslandSize
+
+    private var accent: Color { Color(hex: message.category) ?? MessageStyle.defaultAccent }
+
+    @ViewBuilder private var info: some View {
+        if let ends = message.endsAt {
+            let now = Date()
+            Text(timerInterval: now...max(ends, now), countsDown: true)
+                .monospacedDigit()
+        } else if let p = message.progress {
+            Text("\(Int((p * 100).rounded()))%")
+        } else {
+            Text(message.title)
+        }
+    }
+
+    var body: some View {
+        let c = controller.compactDims
+        let gap: CGFloat = controller.geo.hasNotch ? controller.geo.restWidth : 8
+
+        VStack(spacing: 0) {
+            HStack(spacing: 0) {
+                ZStack {
+                    Circle().fill(accent.opacity(0.28))
+                    Image(systemName: MessageStyle.symbol(for: message.kind))
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(accent)
+                }
+                .frame(width: 22, height: 22)
+
+                Spacer(minLength: gap)
+
+                info
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(.white)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+            }
+            .padding(.horizontal, 16)
+            .frame(width: c.width, height: c.height)
+
+            Text(message.body ?? message.title)
+                .font(.system(size: 11))
+                .foregroundColor(Color.white.opacity(0.7))
+                .lineLimit(1)
+                .padding(.horizontal, 22)
+                .frame(width: c.width + 30, height: 20)
+                .opacity(size == .hover ? 1 : 0)
+                .animation(.easeOut(duration: 0.18), value: size)
+        }
+        .frame(width: c.width + 30, height: c.height + 20, alignment: .top)
+    }
+}
+
+/// Expanded: the large rounded card with title, body, progress bar and buttons.
+struct CardView: View {
+    let message: IslandMessage
+    let controller: IslandController
+
+    private var accent: Color { Color(hex: message.category) ?? MessageStyle.defaultAccent }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 10) {
                 ZStack {
                     Circle().fill(accent.opacity(0.25))
-                    Image(systemName: symbol)
+                    Image(systemName: MessageStyle.symbol(for: message.kind))
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundColor(accent)
                 }
@@ -123,8 +191,19 @@ struct CardView: View {
                         .monospacedDigit()
                         .foregroundColor(accent)
                 }
+
+                if !message.ephemeral {
+                    Button {
+                        controller.dismiss(message)
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 16))
+                            .foregroundColor(Color.white.opacity(0.35))
+                    }
+                    .buttonStyle(.plain)
+                }
             }
-            .frame(height: 44 - 8)
+            .frame(height: 36)
 
             if let p = message.progress {
                 ZStack(alignment: .leading) {
@@ -156,8 +235,8 @@ struct CardView: View {
         }
         .padding(.top, controller.geo.hasNotch ? controller.geo.topInset + 8 : 14)
         .padding(.horizontal, 26)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .contentShape(Rectangle())
-        .onTapGesture { controller.dismiss(message) }
+        .frame(width: controller.expandedWidth,
+               height: controller.expandedHeight(for: message),
+               alignment: .top)
     }
 }

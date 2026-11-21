@@ -24,6 +24,8 @@ struct IslandMessage {
     var endsAt: Date?
     /// Which open connection sent it (so button replies can go back). Not part of the format.
     var replyConnection: Int?
+    /// Made by the island itself when you click it while idle (never sent by another app). Closes when the mouse leaves.
+    var ephemeral: Bool = false
 
     var rank: Int {
         switch priority {
